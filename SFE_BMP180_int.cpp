@@ -98,10 +98,10 @@ char SFE_BMP180::begin()
 
 
 
-		c3 = 5*AC3;//precisa (>>10)
+		c3 = AC3;//precisa 5*(>>10)
 		c4 = AC4; //precisa (>>18)/125
-		b1 = 25 * VB1;//precisa (>>20)
-		c5 =  AC5; //precisa (>>20)5
+		b1 =  VB1;//precisa 25*(>>20)
+		c5 =  AC5; //precisa (>>20)/5
 		c6 = AC6;
 		mc =  MC;// precisa (<<1)/25
 		md = MD ;//precisa (>>5)/5
@@ -109,8 +109,8 @@ char SFE_BMP180::begin()
 		x1 = AC2; //precisa (>>8)*5
 		x2 = VB2;//(>>20)*5
 		y0 = c4 ;//(>>3)/125
-		y1 = c4 * c3;//(>>28)/125
-		y2 = c4 * b1;
+		y1 = c4 * c3;//(>>28)/25
+		y2 = c4 * b1;//(>>38)/5
 		p0 = 3783;//(>>6)/25
 		p1 = 65076;//(>>16) //
 		p2 = 1186;//(>>28)
@@ -238,7 +238,7 @@ char SFE_BMP180::startTemperature(void)
 }
 
 
-char SFE_BMP180::getTemperature(double &T)
+char SFE_BMP180::getTemperature(int32_t &T) //fixed point precision 24bit.8bit
 // Retrieve a previously-started temperature reading.
 // Requires begin() to be called once prior to retrieve calibration parameters.
 // Requires startTemperature() to have been called prior and sufficient time elapsed.
@@ -247,14 +247,15 @@ char SFE_BMP180::getTemperature(double &T)
 {
 	unsigned char data[2];
 	char result;
-	double tu, a;
+	int16_t tu;
+	int32_t  a;
 
 	data[0] = BMP180_REG_RESULT;
 
 	result = readBytes(data, 2);
 	if (result) // good read, calculate temperature
 	{
-		tu = (data[0] * 256.0) + data[1];
+		tu = (data[0] <<8) | data[1];
 
 		//example from Bosch datasheet
 		//tu = 27898;
@@ -262,8 +263,8 @@ char SFE_BMP180::getTemperature(double &T)
 		//example from http://wmrx00.sourceforge.net/Arduino/BMP085-Calcs.pdf
 		//tu = 0x69EC;
 
-		a = c5 * (tu - c6);
-		T = a + (mc / (a + md));
+		a = c5 * (tu - c6);//precisa (>>12)/5
+		T = ((a/5)>>12) + ((mc*5) / ((a>>7) + md));
 
 		/*
 		Serial.println();
@@ -316,7 +317,7 @@ char SFE_BMP180::startPressure(char oversampling)
 }
 
 
-char SFE_BMP180::getPressure(double &P, double &T)
+char SFE_BMP180::getPressure(double &P, double &T)// P integer resolution, T fixed point 24b.8b
 // Retrieve a previously started pressure reading, calculate abolute pressure in mbars.
 // Requires begin() to be called once prior to retrieve calibration parameters.
 // Requires startPressure() to have been called prior and sufficient time elapsed.
