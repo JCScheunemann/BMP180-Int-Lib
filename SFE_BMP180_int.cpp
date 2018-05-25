@@ -317,7 +317,7 @@ char SFE_BMP180::startPressure(char oversampling)
 }
 
 
-char SFE_BMP180::getPressure(double &P, double &T)// P integer resolution, T fixed point 24b.8b
+char SFE_BMP180::getPressure(int32_t &P, int32_t &T)// P fixed point 24b.8b resolution, T fixed point 24b.8b
 // Retrieve a previously started pressure reading, calculate abolute pressure in mbars.
 // Requires begin() to be called once prior to retrieve calibration parameters.
 // Requires startPressure() to have been called prior and sufficient time elapsed.
@@ -331,14 +331,14 @@ char SFE_BMP180::getPressure(double &P, double &T)// P integer resolution, T fix
 {
 	unsigned char data[3];
 	char result;
-	double pu,s,x,y,z;
+	int32_t pu,s,x,y,z;
 
 	data[0] = BMP180_REG_RESULT;
 
 	result = readBytes(data, 3);
 	if (result) // good read, calculate pressure
 	{
-		pu = (data[0] * 256.0) + data[1] + (data[2]/256.0);
+		pu = (data[0] <<16) | (data[1]<<8) | (data[2]);
 
 		//example from Bosch datasheet
 		//pu = 23843;
@@ -346,11 +346,11 @@ char SFE_BMP180::getPressure(double &P, double &T)// P integer resolution, T fix
 		//example from http://wmrx00.sourceforge.net/Arduino/BMP085-Calcs.pdf, pu = 0x982FC0;
 		//pu = (0x98 * 256.0) + 0x2F + (0xC0/256.0);
 
-		s = T - 25.0;
-		x = (x2 * pow(s,2)) + (x1 * s) + x0;
-		y = (y2 * pow(s,2)) + (y1 * s) + y0;
-		z = (pu - x) / y;
-		P = (p2 * pow(z,2)) + (p1 * z) + p0;
+		s = T - (25<<8);//T-25
+		x = ((x2*5>>12)*(s*s)) + (x1*5* s) + x0<<8; //x= (x2 * pow(s,2)) + (x1 * s) + x0;
+		y = (((y2>>8) * ((s*s)>>8))>>6)/5 + ((y1 * s)>>12)/25 + (y0>>3)/125;		//y = (y2 * pow(s,2)) + (y1 * s) + y0;
+		z = ((pu - x) / y)<<8;
+		P = ((p2 *z*z + (p1 * z) + p0);
 
 		/*
 		Serial.println();
